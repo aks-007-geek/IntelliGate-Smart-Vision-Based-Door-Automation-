@@ -1,0 +1,60 @@
+import serial
+import numpy as np
+import cv2
+import time
+
+# Set the port, baud rate, and expected frame size
+PORT = 'COM7'
+BAUDRATE = 115200
+WIDTH = 80
+HEIGHT = 60
+BYTES_EXPECTED = WIDTH * HEIGHT
+
+ser = serial.Serial(PORT, BAUDRATE, timeout=1)
+print("Waiting for frame...")
+
+buffer = bytearray()
+receiving = False
+start_time = time.time()
+
+while True:
+    line = ser.readline().decode('utf-8', errors='ignore').strip()
+
+    if "FRAME_START" in line:
+        print("Receiving frame...")
+        buffer = bytearray()  # reset buffer
+        receiving = True
+        continue
+
+    elif "FRAME_END" in line and receiving:
+        print(f"Frame received: {len(buffer)} bytes")
+        if len(buffer) == BYTES_EXPECTED:
+            img = np.frombuffer(buffer, dtype=np.uint8).reshape((HEIGHT, WIDTH))
+            cv2.imwrite("frame.png", img)
+            cv2.imshow("Captured Frame", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        else:
+            print(f"⚠ Incomplete frame: expected {BYTES_EXPECTED}, got {len(buffer)}")
+            # Wait until enough bytes are received
+            print("Waiting for more data...")
+
+        receiving = False
+        print("Waiting for next frame...")
+        continue
+
+    elif receiving:
+        # Read data in chunks and append to buffer
+        incoming = ser.read(ser.in_waiting or 1)
+        buffer.extend(incoming)
+
+        # Log data every 100 bytes to check the progress
+        if len(buffer) % 100 == 0:
+            print(f"Buffer size: {len(buffer)}")
+        
+        # Optional: Add a check if it takes too long to receive full frame
+        if time.time() - start_time > 5:  # If it's taking more than 5 seconds to collect
+            print("Timeout: Frame receiving took too long.")
+            receiving = False
+            buffer.clear()
+            start_time = time.time()  # Reset timer
