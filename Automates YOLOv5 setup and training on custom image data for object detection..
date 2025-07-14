@@ -1,0 +1,31 @@
+import os
+import subprocess
+
+# Step 1: Clone YOLOv5 repository
+if not os.path.exists("yolov5"):
+    subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5"])
+
+# Step 2: Install dependencies
+subprocess.run(["pip", "install", "-r", "yolov5/requirements.txt"])
+
+# Step 3: Create a data.yaml file
+data_yaml = """
+train: ./images/train
+val: ./images/val
+
+nc: 1
+names: ['object']
+"""
+with open("data.yaml", "w") as f:
+    f.write(data_yaml)
+
+# Step 4: Start training
+subprocess.run([
+    "python", "yolov5/train.py",
+    "--img", "640",
+    "--batch", "16",
+    "--epochs", "50",
+    "--data", "data.yaml",
+    "--weights", "yolov5s.pt",
+    "--cache"
+])
