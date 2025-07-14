@@ -1,0 +1,46 @@
+import torch
+import cv2
+import serial
+import time
+
+# Load model
+model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt', force_reload=True)
+
+# Initialize serial connection to Arduino
+arduino = serial.Serial('COM3', 9600, timeout=1)  # Replace with your port
+time.sleep(2)  # Give some time to establish connection
+
+def get_frame():
+    # Simulate capturing frame from OV7670
+    # Replace this with actual image capture from your OV7670 (via serial or storage)
+    return cv2.imread('image.jpg')  # Dummy placeholder
+
+while True:
+    frame = get_frame()
+    if frame is None:
+        print("No image captured.")
+        continue
+
+    results = model(frame)
+    detections = results.pandas().xyxy[0]
+
+    object_detected = False
+
+    for _, row in detections.iterrows():
+        width = row['xmax'] - row['xmin']
+        height = row['ymax'] - row['ymin']
+        size = max(width, height)
+
+        print(f"Detected object size: {size}px")
+        object_detected = True
+
+        if size < 100:  # Adjust based on your calibration for 20cm
+            arduino.write(b'SINGLE\n')
+        else:
+            arduino.write(b'DOUBLE\n')
+        break
+
+    if not object_detected:
+        arduino.write(b'OFF\n')
+
+    time.sleep(1)
